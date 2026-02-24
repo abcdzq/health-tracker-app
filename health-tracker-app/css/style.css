@@ -633,6 +633,87 @@ body {
   font-size: 18px;
 }
 
+/* ===== Photo Upload ===== */
+.photo-upload-area {
+  min-height: 48px;
+}
+
+.photo-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.photo-preview {
+  position: relative;
+  display: inline-block;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.photo-preview-img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.photo-remove-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== Meal Photo (in list) ===== */
+.meal-photo {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.meal-photo img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  display: block;
+  border-radius: 8px;
+  transition: opacity 0.2s;
+}
+
+.meal-photo:active img {
+  opacity: 0.8;
+}
+
+.meal-item.has-photo {
+  flex-wrap: wrap;
+}
+
+/* ===== Photo Full Viewer ===== */
+.photo-viewer {
+  align-items: center !important;
+  background: rgba(0,0,0,0.85) !important;
+  cursor: pointer;
+}
+
+.photo-fullview {
+  max-width: 95%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
 /* ===== Toast ===== */
 .toast {
   position: fixed;

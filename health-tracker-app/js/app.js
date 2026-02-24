@@ -4,6 +4,7 @@ const App = {
   calendarMonth: new Date().getMonth(),
   selectedHistoryDate: null,
   editingMealId: null,
+  _pendingPhotoData: null,
 
   init() {
     this.updateHeaderDate();
@@ -42,7 +43,7 @@ const App = {
     this.renderMeals(record.meals);
   },
 
-  renderMeals(meals) {
+  async renderMeals(meals) {
     const container = document.getElementById('mealsContent');
     if (meals.length === 0) {
       container.innerHTML = `
@@ -56,15 +57,23 @@ const App = {
     const order = ['breakfast', 'lunch', 'dinner', 'snack'];
     const sorted = [...meals].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
 
-    container.innerHTML = sorted.map(meal => {
+    const htmlParts = await Promise.all(sorted.map(async meal => {
       const mt = Utils.MEAL_TYPES[meal.type];
+      let photoHtml = '';
+      if (meal.photoId) {
+        const photo = await PhotoDB.get(meal.photoId);
+        if (photo) {
+          photoHtml = `<div class="meal-photo" onclick="App.viewPhoto('${meal.photoId}')"><img src="${photo.data}"></div>`;
+        }
+      }
       return `
-        <div class="meal-item">
+        <div class="meal-item${photoHtml ? ' has-photo' : ''}">
           <span class="meal-icon">${mt.icon}</span>
           <div class="meal-info">
             <div class="meal-type">${mt.label}</div>
             <div class="meal-food">${this.escapeHtml(meal.food)}</div>
             ${meal.note ? `<div class="meal-note">${this.escapeHtml(meal.note)}</div>` : ''}
+            ${photoHtml}
           </div>
           <div class="meal-actions">
             <button class="btn-icon" onclick="App.openMealModal('${meal.id}')">
@@ -75,7 +84,18 @@ const App = {
             </button>
           </div>
         </div>`;
-    }).join('');
+    }));
+
+    container.innerHTML = htmlParts.join('');
+  },
+
+  async viewPhoto(photoId) {
+    const photo = await PhotoDB.get(photoId);
+    if (!photo) return;
+    document.getElementById('modalContainer').innerHTML = `
+      <div class="modal-overlay photo-viewer" onclick="App.closeModal()">
+        <img src="${photo.data}" class="photo-fullview">
+      </div>`;
   },
 
   renderExercise(exercise) {
@@ -98,9 +118,9 @@ const App = {
   },
 
   // ===== Meal Modal =====
-  openMealModal(editId) {
+  async openMealModal(editId) {
     const today = Storage.getTodayStr();
-    let meal = { type: 'breakfast', food: '', note: '' };
+    let meal = { type: 'breakfast', food: '', note: '', photoId: '' };
     let title = '新增飲食記錄';
 
     if (editId) {
@@ -113,6 +133,17 @@ const App = {
     }
 
     this.editingMealId = editId || null;
+    this._pendingPhotoData = null;
+
+    let existingPhotoHtml = '';
+    if (meal.photoId) {
+      const photo = await PhotoDB.get(meal.photoId);
+      if (photo) {
+        existingPhotoHtml = `<img src="${photo.data}" class="photo-preview-img">
+          <button class="photo-remove-btn" onclick="App.removeModalPhoto()">✕</button>`;
+        this._pendingPhotoData = photo.data;
+      }
+    }
 
     const chips = Object.entries(Utils.MEAL_TYPES).map(([key, val]) =>
       `<button class="chip ${meal.type === key ? 'selected' : ''}" data-type="${key}" onclick="App.selectMealType('${key}')">${val.icon} ${val.label}</button>`
@@ -134,6 +165,26 @@ const App = {
             <label class="form-label">備註（選填）</label>
             <input class="form-input" id="mealNoteInput" type="text" placeholder="例如：少飯、外帶" value="${this.escapeHtml(meal.note)}" autocomplete="off">
           </div>
+          <div class="form-group">
+            <label class="form-label">食物照片（選填）</label>
+            <div class="photo-upload-area" id="photoArea">
+              <div class="photo-preview" id="photoPreview" style="${existingPhotoHtml ? '' : 'display:none'}">
+                ${existingPhotoHtml}
+              </div>
+              <div class="photo-buttons" id="photoButtons" style="${existingPhotoHtml ? 'display:none' : ''}">
+                <button class="btn btn-outline btn-sm" onclick="App.triggerPhotoCapture()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  拍照
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="App.triggerPhotoGallery()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  相簿
+                </button>
+              </div>
+              <input type="file" id="photoCaptureInput" accept="image/*" capture="environment" style="display:none" onchange="App.handlePhotoSelected(event)">
+              <input type="file" id="photoGalleryInput" accept="image/*" style="display:none" onchange="App.handlePhotoSelected(event)">
+            </div>
+          </div>
           <div class="modal-actions">
             <button class="btn btn-outline" onclick="App.closeModal()">取消</button>
             <button class="btn btn-primary" onclick="App.saveMeal()">儲存</button>
@@ -150,7 +201,38 @@ const App = {
     });
   },
 
-  saveMeal() {
+  triggerPhotoCapture() {
+    document.getElementById('photoCaptureInput').click();
+  },
+
+  triggerPhotoGallery() {
+    document.getElementById('photoGalleryInput').click();
+  },
+
+  async handlePhotoSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const dataUrl = await PhotoDB.compressImage(file);
+    this._pendingPhotoData = dataUrl;
+
+    const preview = document.getElementById('photoPreview');
+    preview.innerHTML = `<img src="${dataUrl}" class="photo-preview-img">
+      <button class="photo-remove-btn" onclick="App.removeModalPhoto()">✕</button>`;
+    preview.style.display = '';
+    document.getElementById('photoButtons').style.display = 'none';
+
+    event.target.value = '';
+  },
+
+  removeModalPhoto() {
+    this._pendingPhotoData = null;
+    document.getElementById('photoPreview').style.display = 'none';
+    document.getElementById('photoPreview').innerHTML = '';
+    document.getElementById('photoButtons').style.display = '';
+  },
+
+  async saveMeal() {
     const today = Storage.getTodayStr();
     const type = document.querySelector('#mealTypeChips .chip.selected')?.dataset.type;
     const food = document.getElementById('mealFoodInput').value.trim();
@@ -162,21 +244,45 @@ const App = {
       return;
     }
 
+    let photoId = '';
+    if (this._pendingPhotoData) {
+      photoId = 'p' + Date.now();
+      if (this.editingMealId) {
+        const record = Storage.getDayRecord(today);
+        const existing = record.meals.find(m => m.id === this.editingMealId);
+        if (existing?.photoId && existing.photoId !== photoId) {
+          await PhotoDB.delete(existing.photoId);
+        }
+        photoId = existing?.photoId && this._pendingPhotoData ? 'p' + Date.now() : (existing?.photoId || photoId);
+      }
+      await PhotoDB.save(photoId, this._pendingPhotoData);
+    } else if (this.editingMealId) {
+      const record = Storage.getDayRecord(today);
+      const existing = record.meals.find(m => m.id === this.editingMealId);
+      if (existing?.photoId) {
+        await PhotoDB.delete(existing.photoId);
+      }
+    }
+
     if (this.editingMealId) {
-      Storage.updateMeal(today, this.editingMealId, { type, food, note });
+      Storage.updateMeal(today, this.editingMealId, { type, food, note, photoId });
       this.showToast('已更新記錄');
     } else {
-      Storage.addMeal(today, { type, food, note });
+      Storage.addMeal(today, { type, food, note, photoId });
       this.showToast('已新增記錄');
     }
 
+    this._pendingPhotoData = null;
     this.closeModal();
     this.renderToday();
   },
 
   deleteMealConfirm(mealId) {
-    this.showConfirm('刪除記錄', '確定要刪除這筆飲食記錄嗎？', () => {
+    this.showConfirm('刪除記錄', '確定要刪除這筆飲食記錄嗎？', async () => {
       const today = Storage.getTodayStr();
+      const record = Storage.getDayRecord(today);
+      const meal = record.meals.find(m => m.id === mealId);
+      if (meal?.photoId) await PhotoDB.delete(meal.photoId);
       Storage.deleteMeal(today, mealId);
       this.renderToday();
       this.showToast('已刪除記錄');
@@ -312,7 +418,7 @@ const App = {
     this.renderCalendar();
   },
 
-  openDayDetail(dateStr) {
+  async openDayDetail(dateStr) {
     this.selectedHistoryDate = dateStr;
     document.getElementById('calendarView').style.display = 'none';
     document.getElementById('dayDetailView').style.display = '';
@@ -323,7 +429,6 @@ const App = {
 
     let html = '';
 
-    // Exercise
     html += '<div class="card"><div class="card-title"><span class="icon">🏃</span> 運動</div>';
     if (record.exercise.done) {
       html += `<div class="exercise-status"><span class="exercise-badge done">✅ 已運動</span></div>`;
@@ -336,25 +441,32 @@ const App = {
     }
     html += '</div>';
 
-    // Meals
     html += '<div class="card"><div class="card-title"><span class="icon">🍽️</span> 飲食</div>';
     if (record.meals.length === 0) {
       html += '<div class="empty-state"><p>這天沒有飲食記錄</p></div>';
     } else {
       const order = ['breakfast', 'lunch', 'dinner', 'snack'];
       const sorted = [...record.meals].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
-      sorted.forEach(meal => {
+      for (const meal of sorted) {
         const mt = Utils.MEAL_TYPES[meal.type];
+        let photoHtml = '';
+        if (meal.photoId) {
+          const photo = await PhotoDB.get(meal.photoId);
+          if (photo) {
+            photoHtml = `<div class="meal-photo" onclick="App.viewPhoto('${meal.photoId}')"><img src="${photo.data}"></div>`;
+          }
+        }
         html += `
-          <div class="meal-item">
+          <div class="meal-item${photoHtml ? ' has-photo' : ''}">
             <span class="meal-icon">${mt.icon}</span>
             <div class="meal-info">
               <div class="meal-type">${mt.label}</div>
               <div class="meal-food">${this.escapeHtml(meal.food)}</div>
               ${meal.note ? `<div class="meal-note">${this.escapeHtml(meal.note)}</div>` : ''}
+              ${photoHtml}
             </div>
           </div>`;
-      });
+      }
     }
     html += '</div>';
 
@@ -373,9 +485,11 @@ const App = {
     if (el) el.textContent = Storage.getAllDatesWithRecords().length;
   },
 
-  exportData() {
+  async exportData() {
     const data = Storage.exportAll();
-    const json = JSON.stringify(data, null, 2);
+    const photos = await PhotoDB.getAll();
+    const exportObj = { records: data, photos };
+    const json = JSON.stringify(exportObj, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -383,7 +497,7 @@ const App = {
     a.download = `health-tracker-${Storage.getTodayStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    this.showToast('資料已匯出');
+    this.showToast('資料已匯出（含照片）');
   },
 
   triggerImport() {
@@ -395,10 +509,16 @@ const App = {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = JSON.parse(e.target.result);
-        Storage.importAll(data);
+        const parsed = JSON.parse(e.target.result);
+        const records = parsed.records || parsed;
+        Storage.importAll(records);
+        if (parsed.photos && Array.isArray(parsed.photos)) {
+          for (const photo of parsed.photos) {
+            if (photo.id && photo.data) await PhotoDB.save(photo.id, photo.data);
+          }
+        }
         this.renderToday();
         this.renderCalendar();
         this.updateRecordCount();
@@ -412,8 +532,9 @@ const App = {
   },
 
   confirmClearData() {
-    this.showConfirm('清除所有資料', '確定要刪除所有記錄嗎？此操作無法復原。', () => {
+    this.showConfirm('清除所有資料', '確定要刪除所有記錄嗎？此操作無法復原。', async () => {
       Storage.clearAll();
+      await PhotoDB.clearAll();
       this.renderToday();
       this.renderCalendar();
       this.updateRecordCount();
