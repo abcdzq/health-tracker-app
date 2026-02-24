@@ -659,6 +659,61 @@ body {
   to { opacity: 0; }
 }
 
+/* ===== Lock Screen ===== */
+.lock-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.lock-screen.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lock-card {
+  width: calc(100% - 48px);
+  max-width: 320px;
+  text-align: center;
+}
+
+.lock-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.lock-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.lock-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.lock-input {
+  text-align: center;
+  font-size: 18px !important;
+  letter-spacing: 2px;
+}
+
+.lock-error {
+  color: var(--danger);
+  font-size: 13px;
+  min-height: 20px;
+  margin-bottom: 8px;
+}
+
 /* ===== Confirm Dialog ===== */
 .confirm-overlay {
   position: fixed;

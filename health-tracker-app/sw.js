@@ -1,9 +1,10 @@
-const CACHE_NAME = 'health-tracker-v1';
+const CACHE_NAME = 'health-tracker-v2';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './js/app.js',
+  './js/auth.js',
   './js/storage.js',
   './js/utils.js',
   './manifest.json'

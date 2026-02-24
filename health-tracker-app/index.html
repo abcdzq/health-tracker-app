@@ -12,6 +12,23 @@
 </head>
 <body>
 
+  <!-- Lock Screen -->
+  <div class="lock-screen" id="lockScreen">
+    <div class="lock-card">
+      <div class="lock-icon">🔒</div>
+      <div class="lock-title" id="lockTitle">輸入密碼</div>
+      <div class="lock-subtitle" id="lockSubtitle">請輸入密碼以解鎖</div>
+      <div class="form-group">
+        <input class="form-input lock-input" id="lockPassword" type="password" placeholder="密碼" autocomplete="off">
+      </div>
+      <div class="form-group" id="lockConfirmGroup" style="display:none">
+        <input class="form-input lock-input" id="lockConfirmPassword" type="password" placeholder="再次輸入密碼" autocomplete="off">
+      </div>
+      <div class="lock-error" id="lockError"></div>
+      <button class="btn btn-primary btn-block" id="lockSubmit" onclick="Auth.handleSubmit()">解鎖</button>
+    </div>
+  </div>
+
   <!-- Header -->
   <div class="header">
     <span>健康追蹤</span>
@@ -102,6 +119,25 @@
     </div>
 
     <div class="card" style="margin-top: 16px;">
+      <div class="settings-item" onclick="App.openChangePasswordModal()">
+        <div class="settings-icon">🔑</div>
+        <div class="settings-info">
+          <div class="title">修改密碼</div>
+          <div class="desc">變更存取密碼</div>
+        </div>
+        <span class="settings-arrow">›</span>
+      </div>
+      <div class="settings-item" onclick="Auth.lock()">
+        <div class="settings-icon">🔒</div>
+        <div class="settings-info">
+          <div class="title">立即鎖定</div>
+          <div class="desc">鎖定 App，需重新輸入密碼</div>
+        </div>
+        <span class="settings-arrow">›</span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 16px;">
       <div class="settings-item" style="border:none; cursor:default;">
         <div class="settings-icon">ℹ️</div>
         <div class="settings-info">
@@ -136,10 +172,24 @@
   <script src="js/utils.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
     }
+    document.getElementById('lockPassword').addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const confirmGroup = document.getElementById('lockConfirmGroup');
+        if (confirmGroup.style.display !== 'none') {
+          document.getElementById('lockConfirmPassword').focus();
+        } else {
+          Auth.handleSubmit();
+        }
+      }
+    });
+    document.getElementById('lockConfirmPassword').addEventListener('keydown', e => {
+      if (e.key === 'Enter') Auth.handleSubmit();
+    });
   </script>
 </body>
 </html>

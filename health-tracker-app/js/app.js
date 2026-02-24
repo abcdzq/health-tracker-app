@@ -421,6 +421,53 @@ const App = {
     });
   },
 
+  // ===== Change Password =====
+  openChangePasswordModal() {
+    document.getElementById('modalContainer').innerHTML = `
+      <div class="modal-overlay" onclick="App.closeModalOnOverlay(event)">
+        <div class="modal">
+          <div class="modal-title">修改密碼</div>
+          <div class="form-group">
+            <label class="form-label">目前密碼</label>
+            <input class="form-input" id="cpOldPw" type="password" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label">新密碼（至少 4 字元）</label>
+            <input class="form-input" id="cpNewPw" type="password" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label">確認新密碼</label>
+            <input class="form-input" id="cpConfirmPw" type="password" autocomplete="off">
+          </div>
+          <div class="lock-error" id="cpError"></div>
+          <div class="modal-actions">
+            <button class="btn btn-outline" onclick="App.closeModal()">取消</button>
+            <button class="btn btn-primary" onclick="App.submitChangePassword()">確認修改</button>
+          </div>
+        </div>
+      </div>`;
+    setTimeout(() => document.getElementById('cpOldPw').focus(), 300);
+  },
+
+  async submitChangePassword() {
+    const oldPw = document.getElementById('cpOldPw').value;
+    const newPw = document.getElementById('cpNewPw').value;
+    const confirmPw = document.getElementById('cpConfirmPw').value;
+    const errorEl = document.getElementById('cpError');
+
+    if (!oldPw) { errorEl.textContent = '請輸入目前密碼'; return; }
+    if (newPw.length < 4) { errorEl.textContent = '新密碼至少需要 4 個字元'; return; }
+    if (newPw !== confirmPw) { errorEl.textContent = '兩次新密碼不一致'; return; }
+
+    const ok = await Auth.changePassword(oldPw, newPw);
+    if (ok) {
+      this.closeModal();
+      this.showToast('密碼已修改');
+    } else {
+      errorEl.textContent = '目前密碼錯誤';
+    }
+  },
+
   // ===== UI Helpers =====
   closeModal() {
     document.getElementById('modalContainer').innerHTML = '';
@@ -477,4 +524,4 @@ const App = {
   }
 };
 
-document.addEventListener('DOMContentLoaded', () => App.init());
+document.addEventListener('DOMContentLoaded', () => Auth.init());
