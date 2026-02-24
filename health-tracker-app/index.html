@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4CAF50">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>健康追蹤</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <span>健康追蹤</span>
+    <span class="header-date" id="headerDate"></span>
+  </div>
+
+  <!-- ===== Today Page ===== -->
+  <div class="page active" id="page-today">
+    <div class="add-buttons">
+      <button class="btn btn-primary" onclick="App.openMealModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        新增飲食
+      </button>
+      <button class="btn btn-accent" onclick="App.openExerciseModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        記錄運動
+      </button>
+    </div>
+
+    <!-- Exercise Status -->
+    <div class="card" id="exerciseCard">
+      <div class="card-title"><span class="icon">🏃</span> 今日運動</div>
+      <div id="exerciseContent"></div>
+    </div>
+
+    <!-- Meals List -->
+    <div class="card" id="mealsCard">
+      <div class="card-title"><span class="icon">🍽️</span> 今日飲食</div>
+      <div id="mealsContent"></div>
+    </div>
+  </div>
+
+  <!-- ===== History Page ===== -->
+  <div class="page" id="page-history">
+    <div id="calendarView">
+      <div class="card">
+        <div class="calendar-header">
+          <button class="btn-icon" onclick="App.prevMonth()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="calendar-month" id="calendarMonth"></span>
+          <button class="btn-icon" onclick="App.nextMonth()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+    </div>
+
+    <div id="dayDetailView" style="display:none">
+      <div class="day-detail-header">
+        <button class="btn-icon" onclick="App.closeDayDetail()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="day-detail-date" id="dayDetailDate"></span>
+      </div>
+      <div id="dayDetailContent"></div>
+    </div>
+  </div>
+
+  <!-- ===== Settings Page ===== -->
+  <div class="page" id="page-settings">
+    <div class="card">
+      <div class="settings-item" onclick="App.exportData()">
+        <div class="settings-icon">📤</div>
+        <div class="settings-info">
+          <div class="title">匯出資料</div>
+          <div class="desc">將所有記錄匯出為 JSON 檔案</div>
+        </div>
+        <span class="settings-arrow">›</span>
+      </div>
+      <div class="settings-item" onclick="App.triggerImport()">
+        <div class="settings-icon">📥</div>
+        <div class="settings-info">
+          <div class="title">匯入資料</div>
+          <div class="desc">從 JSON 檔案匯入記錄</div>
+        </div>
+        <span class="settings-arrow">›</span>
+      </div>
+      <div class="settings-item" onclick="App.confirmClearData()">
+        <div class="settings-icon">🗑️</div>
+        <div class="settings-info">
+          <div class="title">清除所有資料</div>
+          <div class="desc">刪除所有飲食和運動記錄</div>
+        </div>
+        <span class="settings-arrow">›</span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 16px;">
+      <div class="settings-item" style="border:none; cursor:default;">
+        <div class="settings-icon">ℹ️</div>
+        <div class="settings-info">
+          <div class="title">健康追蹤 v1.0</div>
+          <div class="desc">資料儲存在你的裝置本地<br>記錄數量：<span id="recordCount">0</span> 天</div>
+        </div>
+      </div>
+    </div>
+
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="App.importData(event)">
+  </div>
+
+  <!-- ===== Bottom Navigation ===== -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-page="today" onclick="App.switchPage('today')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      今日
+    </button>
+    <button class="nav-item" data-page="history" onclick="App.switchPage('history')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      歷史
+    </button>
+    <button class="nav-item" data-page="settings" onclick="App.switchPage('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      設定
+    </button>
+  </nav>
+
+  <!-- Modal Container -->
+  <div id="modalContainer"></div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+</body>
+</html>
