@@ -1,6 +1,7 @@
 const Auth = {
   HASH_KEY: 'ht_auth_hash',
   SESSION_KEY: 'ht_auth_session',
+  SETUP_KEY: 'ht_auth_setup_done',
 
   async hashPassword(password) {
     const encoder = new TextEncoder();
@@ -14,14 +15,29 @@ const Auth = {
     return !!localStorage.getItem(this.HASH_KEY);
   },
 
+  hasCompletedSetup() {
+    return localStorage.getItem(this.SETUP_KEY) === 'true';
+  },
+
   isUnlocked() {
+    if (!this.hasPassword()) return true;
     return sessionStorage.getItem(this.SESSION_KEY) === 'true';
   },
 
   async setPassword(password) {
     const hash = await this.hashPassword(password);
     localStorage.setItem(this.HASH_KEY, hash);
+    localStorage.setItem(this.SETUP_KEY, 'true');
     sessionStorage.setItem(this.SESSION_KEY, 'true');
+  },
+
+  removePassword() {
+    localStorage.removeItem(this.HASH_KEY);
+    sessionStorage.removeItem(this.SESSION_KEY);
+  },
+
+  skipSetup() {
+    localStorage.setItem(this.SETUP_KEY, 'true');
   },
 
   async verify(password) {
@@ -35,6 +51,10 @@ const Auth = {
   },
 
   lock() {
+    if (!this.hasPassword()) {
+      App.showToast('尚未設定密碼，無法鎖定');
+      return;
+    }
     sessionStorage.removeItem(this.SESSION_KEY);
     this.showLockScreen();
   },
@@ -47,7 +67,8 @@ const Auth = {
   },
 
   showLockScreen() {
-    const isSetup = !this.hasPassword();
+    const isFirstTime = !this.hasCompletedSetup();
+    const hasPassword = this.hasPassword();
     const screen = document.getElementById('lockScreen');
     const title = document.getElementById('lockTitle');
     const subtitle = document.getElementById('lockSubtitle');
@@ -55,16 +76,26 @@ const Auth = {
     const confirmGroup = document.getElementById('lockConfirmGroup');
     const confirmInput = document.getElementById('lockConfirmPassword');
     const submitBtn = document.getElementById('lockSubmit');
+    const skipBtn = document.getElementById('lockSkip');
     const errorEl = document.getElementById('lockError');
 
-    title.textContent = isSetup ? '設定密碼' : '輸入密碼';
-    subtitle.textContent = isSetup ? '首次使用，請設定存取密碼' : '請輸入密碼以解鎖';
-    submitBtn.textContent = isSetup ? '確認設定' : '解鎖';
-    confirmGroup.style.display = isSetup ? '' : 'none';
+    if (isFirstTime) {
+      title.textContent = '歡迎使用健康追蹤';
+      subtitle.textContent = '你可以設定密碼保護資料，或直接跳過';
+      submitBtn.textContent = '設定密碼';
+      confirmGroup.style.display = '';
+      skipBtn.style.display = '';
+    } else {
+      title.textContent = '輸入密碼';
+      subtitle.textContent = '請輸入密碼以解鎖';
+      submitBtn.textContent = '解鎖';
+      confirmGroup.style.display = 'none';
+      skipBtn.style.display = 'none';
+    }
+
     errorEl.textContent = '';
     input.value = '';
     confirmInput.value = '';
-
     screen.classList.add('visible');
     setTimeout(() => input.focus(), 300);
   },
@@ -73,19 +104,25 @@ const Auth = {
     document.getElementById('lockScreen').classList.remove('visible');
   },
 
+  handleSkip() {
+    this.skipSetup();
+    this.hideLockScreen();
+    App.init();
+  },
+
   async handleSubmit() {
     const input = document.getElementById('lockPassword');
     const confirmInput = document.getElementById('lockConfirmPassword');
     const errorEl = document.getElementById('lockError');
     const password = input.value;
+    const isFirstTime = !this.hasCompletedSetup();
 
-    if (!password || password.length < 4) {
-      errorEl.textContent = '密碼至少需要 4 個字元';
-      input.focus();
-      return;
-    }
-
-    if (!this.hasPassword()) {
+    if (isFirstTime) {
+      if (!password || password.length < 4) {
+        errorEl.textContent = '密碼至少需要 4 個字元';
+        input.focus();
+        return;
+      }
       if (password !== confirmInput.value) {
         errorEl.textContent = '兩次密碼不一致';
         confirmInput.focus();
@@ -95,6 +132,11 @@ const Auth = {
       this.hideLockScreen();
       App.init();
     } else {
+      if (!password) {
+        errorEl.textContent = '請輸入密碼';
+        input.focus();
+        return;
+      }
       const ok = await this.verify(password);
       if (ok) {
         this.hideLockScreen();
@@ -108,6 +150,10 @@ const Auth = {
   },
 
   init() {
+    if (!this.hasCompletedSetup()) {
+      this.showLockScreen();
+      return;
+    }
     if (this.isUnlocked()) {
       App.init();
       return;
